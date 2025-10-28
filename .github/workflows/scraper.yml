@@ -26,7 +26,7 @@ jobs:
           pip install selenium pandas webdriver-manager fake-useragent
 
       - name: Run Selenium scraper
-        run: python bitcoin_scraper.py
+        run: python bitcoin_scraper_optimized.py
 
       - name: Commit and Push updated CSV
         run: |
