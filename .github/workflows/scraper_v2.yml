@@ -2,7 +2,8 @@ name: Bitcoin Scraper V2 (Optimized)
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # Run every 10 min
+    - cron: "5-59/10 * * * *"  # runs every 10 minutes but offset by 5 min
+
   workflow_dispatch:       # Allow manual trigger from Actions tab
 
 jobs:
