@@ -19,7 +19,7 @@ options.add_argument("--window-size=1920,1080")
 ua = UserAgent()
 options.add_argument(f"user-agent={ua.random}")
 
-service = Service(ChromeDriverManager(cache_valid_range=30).install())
+service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 URL = "https://coinmarketcap.com/currencies/bitcoin/"
 
