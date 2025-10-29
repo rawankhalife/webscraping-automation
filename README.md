@@ -1,4 +1,3 @@
-# webscraping-automation
 # 🪙 Bitcoin Data Scraper & Dashboard
 
 This project automatically scrapes **Bitcoin market data** from [CoinMarketCap](https://coinmarketcap.com/currencies/bitcoin/) and updates a public CSV file and web dashboard using **GitHub Actions**.
