@@ -1,0 +1,38 @@
+name: Bitcoin Scraper V2 (Hourly Optimized)
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # Run every hour
+  workflow_dispatch:       # Allow manual trigger from Actions tab
+
+jobs:
+  scrape-bitcoin-v2:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser
+          pip install selenium pandas webdriver-manager fake-useragent
+
+      - name: Run Optimized Scraper
+        run: python bitcoin_scraper_optimized.py
+
+      - name: Commit and Push updated CSV
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add bitcoin_hourly_data_v2.csv
+          git commit -m "Updated Bitcoin data (Hourly Optimized)"
+          git push
