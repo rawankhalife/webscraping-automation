@@ -26,6 +26,7 @@ This project automatically scrapes **Bitcoin market data** from [CoinMarketCap](
 3. A GitHub Action (`.github/workflows/scraper_v2.yml`) runs automatically every 10 minutes.  
 4. The latest CSV is committed and used by the dashboard.  
 5. `script.js` / `script_v2.js` dynamically fetch the CSV and display the data in the HTML page.
+6. The optimized results can be viewed on 'https://rawankhalife.github.io/webscraping-automation/bitcoin_v2.html'
 
 ---
 pip install -r requirements.txt
