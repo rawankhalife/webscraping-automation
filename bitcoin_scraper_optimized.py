@@ -43,6 +43,19 @@ def scrape_bitcoin_data():
         "circulating_supply": safe_get_text(driver, "//dt[.//div[contains(text(),'Circulating supply')]]/following-sibling::dd//span"),
         "price_change_24h": safe_get_text(driver, "//p[contains(@class, 'change-text')]")
     }
+
+    try:
+        bullish = driver.find_elements(By.XPATH,
+            "//span[contains(@class, 'sc-65e7f566-0 cOjBdO') and contains(@class, 'ratio')]")
+        bearish = driver.find_elements(By.XPATH,
+            "//span[contains(@class, 'sc-65e7f566-0 iKkbth') and contains(@class, 'ratio')]")
+
+        data["bullish_sentiment"] = bullish[0].text if bullish else "N/A"
+        data["bearish_sentiment"] = bearish[0].text if bearish else "N/A"
+    except:
+        data["bullish_sentiment"] = "N/A"
+        data["bearish_sentiment"] = "N/A"
+
     return data
 
 def save_to_csv(data, file_name="bitcoin_hourly_data_v2.csv"):
