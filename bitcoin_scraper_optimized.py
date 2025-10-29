@@ -4,6 +4,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 from fake_useragent import UserAgent
 import pandas as pd
@@ -23,11 +24,30 @@ service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=options)
 URL = "https://coinmarketcap.com/currencies/bitcoin/"
 
-def safe_get_text(driver, xpath):
+
+def safe_get_text(driver, xpath, timeout=15):
     try:
-        return driver.find_element(By.XPATH, xpath).text
-    except:
+        elem = WebDriverWait(driver, timeout).until(
+            EC.visibility_of_element_located((By.XPATH, xpath))
+        )
+        txt = elem.text.strip()
+        if not txt:
+            # fallback in case .text is empty on dynamic sites
+            txt = elem.get_attribute("textContent") or ""
+            txt = txt.strip()
+        return txt if txt else "N/A"
+    except (StaleElementReferenceException, TimeoutException):
+        # one quick retry for staleness
+        try:
+            elem = WebDriverWait(driver, timeout).until(
+                EC.visibility_of_element_located((By.XPATH, xpath))
+            )
+            return (elem.text or elem.get_attribute("textContent") or "").strip() or "N/A"
+        except Exception:
+            return "N/A"
+    except Exception:
         return "N/A"
+
 
 def scrape_bitcoin_data():
     driver.get(URL)
@@ -35,13 +55,23 @@ def scrape_bitcoin_data():
         EC.presence_of_element_located((By.XPATH, '//span[@data-test="text-cdp-price-display"]'))
     )
 
+    def get_sentiment(driver, main_class, sub_class):
+        try:
+            xpath = f"//span[contains(@class,'{main_class}') and contains(@class,'{sub_class}') and contains(@class,'ratio')]"
+            elem = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, xpath)))
+            return elem.text.strip() or elem.get_attribute("textContent").strip() or "N/A"
+        except:
+            return "N/A"
+
     data = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "price": safe_get_text(driver, '//span[@data-test="text-cdp-price-display"]'),
-        "market_cap": safe_get_text(driver, "//dt[.//div[contains(text(),'Market cap')]]/following-sibling::dd//span"),
+        "market_cap": safe_get_text(driver, "//dt[contains(., 'Market cap')]/following::dd[1]//span[1]"),
         "volume_24h": safe_get_text(driver, "//dt[.//div[contains(text(),'Volume (24h')]]/following-sibling::dd//span"),
         "circulating_supply": safe_get_text(driver, "//dt[.//div[contains(text(),'Circulating supply')]]/following-sibling::dd//span"),
-        "price_change_24h": safe_get_text(driver, "//p[contains(@class, 'change-text')]")
+        "price_change_24h": safe_get_text(driver, "//p[contains(@class, 'change-text')]"),
+        "bullish_sentiment": get_sentiment(driver, "sc-65e7f566-0", "cOjBdO"),
+        "bearish_sentiment": get_sentiment(driver, "sc-65e7f566-0", "iKkbth")
     }
     return data
 
