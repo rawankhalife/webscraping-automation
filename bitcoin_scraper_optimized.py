@@ -1,48 +1,43 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
-from fake_useragent import UserAgent
-import pandas as pd
-import os, logging, time
-from datetime import datetime
+from selenium import webdriver 
+from selenium.webdriver.chrome.service import Service 
+from selenium.webdriver.chrome.options import Options 
+from selenium.webdriver.common.by import By 
+from selenium.webdriver.support.ui import WebDriverWait 
+from selenium.webdriver.support import expected_conditions as EC 
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException 
+from webdriver_manager.chrome import ChromeDriverManager 
+from fake_useragent import UserAgent 
+import pandas as pd 
+import os, logging 
+from datetime import datetime 
 
-# --- Setup Chrome ---
-options = Options()
-options.add_argument("--headless")  # run silently
-options.add_argument("--disable-gpu")
-options.add_argument("--window-size=1920,1080")
-
-ua = UserAgent()
-options.add_argument(f"user-agent={ua.random}")
-
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+# --- Setup --- 
+options = Options() 
+options.add_argument("--headless") 
+options.add_argument("--disable-gpu") 
+options.add_argument("--window-size=1920,1080") 
+ua = UserAgent() 
+options.add_argument(f"user-agent={ua.random}") 
+service = Service(ChromeDriverManager().install()) 
+driver = webdriver.Chrome(service=service, options=options) 
 
 URL = "https://coinmarketcap.com/currencies/bitcoin/"
 
-def safe_get_text(driver, xpath, timeout=15): 
-    try: 
-        elem = WebDriverWait(driver, timeout).until( 
-            EC.visibility_of_element_located((By.XPATH, xpath)) 
-            ) 
-        txt = elem.text.strip() 
-        if not txt: 
-            txt = elem.get_attribute("textContent") or "" 
-            txt = txt.strip() 
-            return txt if txt else "N/A" 
-    except (StaleElementReferenceException, TimeoutException): 
-        try: 
-            elem = WebDriverWait(driver, timeout).until( 
-            EC.visibility_of_element_located((By.XPATH, xpath)) 
-            ) 
-            return (elem.text or elem.get_attribute("textContent") or "").strip() or "N/A" 
-        except Exception: return "N/A" 
-    except Exception: return "N/A"
+def safe_get_text(driver, xpath, timeout=15):
+    try:
+        # Wait for element to exist
+        elem = WebDriverWait(driver, timeout).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+        # Wait until text is non-empty (CoinMarketCap renders values late)
+        WebDriverWait(driver, timeout).until(lambda d: elem.text.strip() != "")
+        txt = elem.text.strip()
+        if not txt:
+            txt = elem.get_attribute("textContent") or ""
+            txt = txt.strip()
+        return txt if txt else "N/A"
+    except Exception:
+        return "N/A"
 
 def scrape_bitcoin_data():
     driver.get(URL)
@@ -50,12 +45,13 @@ def scrape_bitcoin_data():
         EC.presence_of_element_located((By.XPATH, '//span[@data-test="text-cdp-price-display"]'))
     )
 
-    def get_sentiment(driver, full_class): 
-        try: 
-            xpath = f"//span[contains(@class, '{full_class}') and contains(@class, 'ratio')]" 
-            elem = driver.find_element(By.XPATH, xpath) 
-            return elem.text.strip() or "N/A" 
-        except: return "N/A" 
+    def get_sentiment(driver, main_class, sub_class):
+        try:
+            xpath = f"//span[contains(@class,'{main_class}') and contains(@class,'{sub_class}') and contains(@class,'ratio')]"
+            elem = WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.XPATH, xpath)))
+            return elem.text.strip() or elem.get_attribute("textContent").strip() or "N/A"
+        except:
+            return "N/A"
 
     data = { 
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
@@ -64,8 +60,8 @@ def scrape_bitcoin_data():
         "volume_24h": safe_get_text(driver, "//dt[.//div[contains(text(),'Volume (24h')]]/following-sibling::dd//span"), 
         "circulating_supply": safe_get_text(driver, "//dt[.//div[contains(text(),'Circulating supply')]]/following-sibling::dd//span"), 
         "price_change_24h": safe_get_text(driver, "//p[contains(@class, 'change-text')]"), 
-        "bullish_sentiment" : get_sentiment(driver, "sc-65e7f566-0 cOjBdO"), 
-        "bearish_sentiment": get_sentiment(driver, "sc-65e7f566-0 iKkbth") 
+        "bullish_sentiment": get_sentiment(driver, "sc-65e7f566-0", "cOjBdO"),
+        "bearish_sentiment": get_sentiment(driver, "sc-65e7f566-0", "iKkbth")
         } 
     
     return data
@@ -73,10 +69,11 @@ def scrape_bitcoin_data():
 def save_to_csv(data, file_name="bitcoin_hourly_data_v2.csv"): 
     df = pd.DataFrame([data]) 
     df.to_csv(file_name, mode='a', header=not os.path.exists(file_name), index=False) 
-    if __name__ == "__main__": 
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s") 
-        logging.info("Scraping Bitcoin Data...") 
-        data = scrape_bitcoin_data() 
-        save_to_csv(data) 
-        logging.info("Data saved successfully.") 
-        driver.quit()
+
+if __name__ == "__main__": 
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s") 
+    logging.info("Scraping Bitcoin Data...") 
+    data = scrape_bitcoin_data() 
+    save_to_csv(data) 
+    logging.info("Data saved successfully.") 
+    driver.quit()
