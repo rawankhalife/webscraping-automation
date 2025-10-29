@@ -45,7 +45,7 @@ def scrape_bitcoin_data():
     }
     return data
 
-def save_to_csv(data, file_name="bitcoin_hourly_data.csv"):
+def save_to_csv(data, file_name="bitcoin_hourly_data_v2.csv"):
     df = pd.DataFrame([data])
     df.to_csv(file_name, mode='a', header=not os.path.exists(file_name), index=False)
 
