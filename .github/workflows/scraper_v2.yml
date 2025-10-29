@@ -1,8 +1,8 @@
-name: Bitcoin Scraper V2 (Hourly Optimized)
+name: Bitcoin Scraper V2 (Optimized)
 
 on:
   schedule:
-    - cron: '0 * * * *'   # Run every hour
+    - cron: '*/10 * * * *'   # Run every 10 min
   workflow_dispatch:       # Allow manual trigger from Actions tab
 
 jobs:
