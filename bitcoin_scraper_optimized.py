@@ -7,90 +7,52 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from fake_useragent import UserAgent
 import pandas as pd
+import os, logging
 from datetime import datetime
 
-# --- Setup Chrome Options ---
+# --- Setup ---
 options = Options()
-options.add_argument("--headless")           # Run in headless mode (faster)
+options.add_argument("--headless")
 options.add_argument("--disable-gpu")
 options.add_argument("--window-size=1920,1080")
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
 
-# Random User-Agent for stealth
-options.add_argument(f"user-agent={UserAgent().random}")
+ua = UserAgent()
+options.add_argument(f"user-agent={ua.random}")
 
-# Initialize ChromeDriver
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+service = Service(ChromeDriverManager(cache_valid_range=30).install())
+driver = webdriver.Chrome(service=service, options=options)
 URL = "https://coinmarketcap.com/currencies/bitcoin/"
 
-# --- Scraper Function ---
+def safe_get_text(driver, xpath):
+    try:
+        return driver.find_element(By.XPATH, xpath).text
+    except:
+        return "N/A"
+
 def scrape_bitcoin_data():
-    """Scrape Bitcoin market data from CoinMarketCap efficiently."""
     driver.get(URL)
+    WebDriverWait(driver, 15).until(
+        EC.presence_of_element_located((By.XPATH, '//span[@data-test="text-cdp-price-display"]'))
+    )
 
-    try:
-        wait = WebDriverWait(driver, 10)
-        # Shorter and faster XPaths (rely on simpler structure & stable attributes)
-        price = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, 'span[data-test="text-cdp-price-display"]'))).text
-        market_cap = driver.find_element(By.XPATH, "//div[text()='Market cap']/ancestor::dt/following-sibling::dd//span").text
-        volume_24h = driver.find_element(By.XPATH, "//div[contains(text(),'Volume (24h')]/ancestor::dt/following-sibling::dd//span").text
-        circulating_supply = driver.find_element(By.XPATH, "//div[contains(text(),'Circulating supply')]/ancestor::dt/following-sibling::dd//span").text
-        price_change_24h = driver.find_element(By.CSS_SELECTOR, "p.change-text").text
-      try:
-          rank = driver.find_element(By.XPATH, "//small[contains(text(),'Rank')]/following-sibling::span").text
-      except:
-          rank = "N/A"
+    data = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "price": safe_get_text(driver, '//span[@data-test="text-cdp-price-display"]'),
+        "market_cap": safe_get_text(driver, "//dt[.//div[contains(text(),'Market cap')]]/following-sibling::dd//span"),
+        "volume_24h": safe_get_text(driver, "//dt[.//div[contains(text(),'Volume (24h')]]/following-sibling::dd//span"),
+        "circulating_supply": safe_get_text(driver, "//dt[.//div[contains(text(),'Circulating supply')]]/following-sibling::dd//span"),
+        "price_change_24h": safe_get_text(driver, "//p[contains(@class, 'change-text')]")
+    }
+    return data
 
-
-        # Sentiment (more resilient lookup)
-        bullish = next((e.text for e in driver.find_elements(By.XPATH, "//span[contains(text(),'%')]") if 'Bullish' in e.get_attribute("outerHTML")), "N/A")
-        bearish = next((e.text for e in driver.find_elements(By.XPATH, "//span[contains(text(),'%')]") if 'Bearish' in e.get_attribute("outerHTML")), "N/A")
-
-        # Timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        return {
-            "timestamp": timestamp,
-            "price": price,
-            "market_cap": market_cap,
-            "volume_24h": volume_24h,
-            "circulating_supply": circulating_supply,
-            "price_change_24h": price_change_24h,
-            "bullish_sentiment": bullish,
-            "bearish_sentiment": bearish
-            "rank": rank
-        }
-
-    except Exception as e:
-        print(f"[ERROR] Scraping failed: {e}")
-        return None
-
-# --- CSV Writer (Optimized & Robust) ---
 def save_to_csv(data, file_name="bitcoin_hourly_data.csv"):
-    """Efficiently save or append data to a CSV file with no corruption risk."""
-    try:
-        df = pd.read_csv(file_name)
-    except FileNotFoundError:
-        df = pd.DataFrame(columns=data.keys())
+    df = pd.DataFrame([data])
+    df.to_csv(file_name, mode='a', header=not os.path.exists(file_name), index=False)
 
-    df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
-
-    # Atomic, robust write (avoids file corruption)
-    temp_file = file_name + ".tmp"
-    df.to_csv(temp_file, index=False, encoding="utf-8-sig", mode="w")
-    import os
-    os.replace(temp_file, file_name)
-
-# --- Main Execution ---
 if __name__ == "__main__":
-    print("⏳ Scraping Bitcoin Data...")
-    scraped = scrape_bitcoin_data()
-
-    if scraped:
-        save_to_csv(scraped)
-        print("✅ Data saved to bitcoin_hourly_data.csv")
-    else:
-        print("❌ Failed to scrape data.")
-
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
+    logging.info("Scraping Bitcoin Data...")
+    data = scrape_bitcoin_data()
+    save_to_csv(data)
+    logging.info("Data saved successfully.")
     driver.quit()
